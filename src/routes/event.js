@@ -37,7 +37,7 @@ router.get("/events", async (req, res) => {
   }
 });
 
-// get a user by id
+// get an event by id
 router.get("/events/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -268,7 +268,7 @@ router.post("/events", async (req, res) => {
   }
 });
 
-// // update a user's password or email
+// // update an event's fields
 router.patch('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -412,7 +412,7 @@ router.patch('/events/:id', async (req, res) => {
   }
 });
 
-// delete a user
+// delete an event
 router.delete('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;

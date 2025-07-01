@@ -12,10 +12,10 @@ app.use(cors({
 app.use(express.json());
 
 const eventRoutes = require('./routes/event');
-// const eventStudentRoutes = require('./routes/event-student');
+const eventStudentRoutes = require('./routes/event-student');
 
 app.use('', eventRoutes)
-// app.use('', eventStudentRoutes)
+app.use('', eventStudentRoutes)
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
