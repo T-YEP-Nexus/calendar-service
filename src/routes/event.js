@@ -102,7 +102,6 @@ router.get("/events/type/:type", async (req, res) => {
       .from("event")
       .select("*")
       .eq("event_type", type)
-      .single();
 
     if (error) {
       if (error.code === "PGRST116") {
