@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 
 require('dotenv').config();
 
@@ -16,6 +18,8 @@ const eventStudentRoutes = require('./routes/event-student');
 
 app.use('', eventRoutes)
 app.use('', eventStudentRoutes)
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {

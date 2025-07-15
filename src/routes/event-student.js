@@ -3,8 +3,24 @@ const router = express.Router();
 const supabase = require("../../config/supabaseClient.js");
 
 // crud routes for the 'event-student' table
+/**
+ * @swagger
+ * tags:
+ *   name: EventStudents
+ *   description: Student assignments to events
+ */
 
 // get all event-students
+/**
+ * @swagger
+ * /event-students:
+ *   get:
+ *     summary: Get all event-student links
+ *     tags: [EventStudents]
+ *     responses:
+ *       200:
+ *         description: Event-student list retrieved
+ */
 router.get("/event-students", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -38,6 +54,25 @@ router.get("/event-students", async (req, res) => {
 });
 
 // get a event-students by id
+/**
+ * @swagger
+ * /event-students/{id}:
+ *   get:
+ *     summary: Get an event-student link by ID
+ *     tags: [EventStudents]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Event-student ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Link found
+ *       404:
+ *         description: Not found
+ */
 router.get("/event-students/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -80,6 +115,24 @@ router.get("/event-students/:id", async (req, res) => {
 });
 
 // get an event-students by student id
+/**
+ * @swagger
+ * /event-students/student/{id_student}:
+ *   get:
+ *     summary: Get all events assigned to a student
+ *     tags: [EventStudents]
+ *     parameters:
+ *       - name: id_student
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of assignments found
+ *       400:
+ *         description: Invalid student ID
+ */
 router.get("/event-students/student/:id_student", async (req, res) => {
   try {
     const { id_student } = req.params;
@@ -129,6 +182,34 @@ router.get("/event-students/student/:id_student", async (req, res) => {
 });
 
 // create an event-students with required fields
+/**
+ * @swagger
+ * /event-students:
+ *   post:
+ *     summary: Assign a student to an event
+ *     tags: [EventStudents]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id_student
+ *               - id_event
+ *             properties:
+ *               id_student:
+ *                 type: string
+ *               id_event:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Assignment created
+ *       400:
+ *         description: Invalid data
+ *       409:
+ *         description: Already assigned
+ */
 router.post("/event-students", async (req, res) => {
   try {
     const { id_student, id_event } = req.body;
@@ -209,6 +290,36 @@ router.post("/event-students", async (req, res) => {
 });
 
 // update an event-students fields
+/**
+ * @swagger
+ * /event-students/{id}:
+ *   patch:
+ *     summary: Update a student-event assignment
+ *     tags: [EventStudents]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id_student:
+ *                 type: string
+ *               id_event:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Assignment updated
+ *       400:
+ *         description: Bad request
+ *       409:
+ *         description: Duplicate assignment
+ */
 router.patch('/event-students/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -327,6 +438,24 @@ router.patch('/event-students/:id', async (req, res) => {
 });
 
 // delete a user
+/**
+ * @swagger
+ * /event-students/{id}:
+ *   delete:
+ *     summary: Delete an event-student link
+ *     tags: [EventStudents]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Assignment deleted
+ *       404:
+ *         description: Not found
+ */
 router.delete('/event-students/:id', async (req, res) => {
   try {
     const { id } = req.params;

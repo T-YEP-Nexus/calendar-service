@@ -3,8 +3,26 @@ const router = express.Router();
 const supabase = require("../../config/supabaseClient.js");
 
 // crud routes for the 'event' table
+/**
+ * @swagger
+ * tags:
+ *   name: Events
+ *   description: Event management
+ */
 
 // get all events
+/**
+ * @swagger
+ * /events:
+ *   get:
+ *     summary: Get all events
+ *     tags: [Events]
+ *     responses:
+ *       200:
+ *         description: List of events retrieved successfully
+ *       500:
+ *         description: Server error
+ */
 router.get("/events", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -38,6 +56,25 @@ router.get("/events", async (req, res) => {
 });
 
 // get an event by id
+/**
+ * @swagger
+ * /events/{id}:
+ *   get:
+ *     summary: Get event by ID
+ *     tags: [Events]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Event ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Event found
+ *       404:
+ *         description: Event not found
+ */
 router.get("/events/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -80,6 +117,25 @@ router.get("/events/:id", async (req, res) => {
 });
 
 // get an event by type
+/**
+ * @swagger
+ * /events/type/{type}:
+ *   get:
+ *     summary: Get events by type
+ *     tags: [Events]
+ *     parameters:
+ *       - name: type
+ *         in: path
+ *         required: true
+ *         description: Event type (e.g. follow-up, keynote)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Events retrieved
+ *       400:
+ *         description: Invalid type
+ */
 router.get("/events/type/:type", async (req, res) => {
   try {
     const { type } = req.params;
@@ -135,6 +191,48 @@ router.get("/events/type/:type", async (req, res) => {
 });
 
 // create an event with required fields
+/**
+ * @swagger
+ * /events:
+ *   post:
+ *     summary: Create a new event
+ *     tags: [Events]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - event_datetime
+ *               - duration_minutes
+ *               - event_type
+ *               - id_creator
+ *             properties:
+ *               title:
+ *                 type: string
+ *               event_datetime:
+ *                 type: string
+ *                 format: date-time
+ *               duration_minutes:
+ *                 type: integer
+ *               description:
+ *                 type: string
+ *               event_type:
+ *                 type: string
+ *               report:
+ *                 type: string
+ *               id_creator:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Event created
+ *       400:
+ *         description: Bad request
+ *       409:
+ *         description: Conflict
+ */
 router.post("/events", async (req, res) => {
   try {
     const {
@@ -268,6 +366,45 @@ router.post("/events", async (req, res) => {
 });
 
 // // update an event's fields
+/**
+ * @swagger
+ * /events/{id}:
+ *   patch:
+ *     summary: Update an event
+ *     tags: [Events]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Event ID
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               event_datetime:
+ *                 type: string
+ *               duration_minutes:
+ *                 type: integer
+ *               description:
+ *                 type: string
+ *               event_type:
+ *                 type: string
+ *               report:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Event updated
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: Event not found
+ */
 router.patch('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -412,6 +549,24 @@ router.patch('/events/:id', async (req, res) => {
 });
 
 // delete an event
+/**
+ * @swagger
+ * /events/{id}:
+ *   delete:
+ *     summary: Delete an event
+ *     tags: [Events]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Event deleted
+ *       404:
+ *         description: Event not found
+ */
 router.delete('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
