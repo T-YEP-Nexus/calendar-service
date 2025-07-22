@@ -15,9 +15,11 @@ app.use(express.json());
 
 const eventRoutes = require('./routes/event');
 const eventStudentRoutes = require('./routes/event-student');
+const agendaRoutes = require('./routes/agenda');
 
 app.use('', eventRoutes)
 app.use('', eventStudentRoutes)
+app.use('/agenda', agendaRoutes)
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

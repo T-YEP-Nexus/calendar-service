@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const supabase = require("../../config/supabaseClient.js");
+const http = require('http');
 
 // crud routes for the 'event' table
 /**
@@ -243,6 +244,7 @@ router.post("/events", async (req, res) => {
       event_type,
       report,
       id_creator,
+      id_prom
     } = req.body;
 
     if (
@@ -336,6 +338,7 @@ router.post("/events", async (req, res) => {
           event_type,
           report,
           id_creator,
+          id_prom,
         },
       ])
       .select()
@@ -349,6 +352,71 @@ router.post("/events", async (req, res) => {
         error: error.message,
       });
     }
+
+    if (data && id_prom) {
+      const eventId = data.id;
+
+      console.log(`[Event Service] Event ${eventId} created. Now assigning students from promotion ${id_prom}.`);
+
+      const options = {
+        hostname: 'localhost',
+        port: 3004,
+        path: `/students/promotion/${id_prom}`,
+        method: 'GET',
+      };
+
+      console.log(`[Event Service] Calling profile-service with options:`, options);
+
+      const req = http.request(options, (res) => {
+        let studentData = '';
+        console.log(`[Event Service] Profile-service response status: ${res.statusCode}`);
+        res.on('data', (chunk) => {
+          studentData += chunk;
+        });
+        res.on('end', async () => {
+          console.log(`[Event Service] Profile-service response body:`, studentData);
+          if (res.statusCode === 200) {
+            try {
+              const parsedData = JSON.parse(studentData);
+              const students = parsedData.data;
+              console.log(`[Event Service] Parsed students:`, students);
+
+              if (students && students.length > 0) {
+                const studentEventInserts = students.map(student => ({
+                  id_student: student.profile.id_user,
+                  id_event: eventId,
+                }));
+
+                console.log(`[Event Service] Preparing to insert into event_student:`, studentEventInserts);
+
+                const { error: insertError } = await supabase
+                  .from('event_student')
+                  .insert(studentEventInserts);
+
+                if (insertError) {
+                  console.error("[Event Service] Error batch inserting students into event:", insertError);
+                } else {
+                  console.log(`[Event Service] Successfully inserted ${studentEventInserts.length} students into event ${eventId}.`);
+                }
+              } else {
+                console.log("[Event Service] No students found for this promotion, or data format is unexpected.");
+              }
+            } catch (e) {
+              console.error("[Event Service] Error parsing JSON from profile-service:", e);
+            }
+          } else {
+            console.error(`[Event Service] Failed to get students from profile-service. Status: ${res.statusCode}, Body: ${studentData}`);
+          }
+        });
+      });
+
+      req.on('error', (e) => {
+        console.error(`[Event Service] Problem with request to profile-service: ${e.message}`);
+      });
+
+      req.end();
+    }
+
 
     res.status(201).json({
       success: true,
@@ -408,12 +476,12 @@ router.post("/events", async (req, res) => {
 router.patch('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, event_datetime, duration_minutes, description, event_type, report } = req.body;
+    const { title, event_datetime, duration_minutes, description, event_type, report, id_prom } = req.body;
 
-    if (!title && !event_datetime && !duration_minutes && !description && !event_type && !report) {
+    if (!title && !event_datetime && !duration_minutes && !description && !event_type && !report && !id_prom) {
       return res.status(400).json({
         success: false,
-        message: 'At least one field (title, event_datetime, duration minutes, description, event_type or report) must be provided'
+        message: 'At least one field (title, event_datetime, duration minutes, description, event_type, report or id_prom) must be provided'
       });
     }
 
@@ -463,14 +531,7 @@ router.patch('/events/:id', async (req, res) => {
         });
         }
 
-        const eventDateTime = new Date(event_datetime);
-        const currentDateTime = new Date();
-        if (eventDateTime < currentDateTime) {
-            return res.status(400).json({
-                success: false,
-                message: 'Event datetime cannot be in the past'
-            });
-        }
+  
         updateData.event_datetime = event_datetime;
     }
 
@@ -509,6 +570,10 @@ router.patch('/events/:id', async (req, res) => {
         updateData.report = report;
     }
 
+    if (id_prom) {
+        updateData.id_prom = id_prom;
+    }
+
     const { data, error } = await supabase
       .from('event')
       .update(updateData)
@@ -530,6 +595,53 @@ router.patch('/events/:id', async (req, res) => {
         message: 'Failed to update event',
         error: error.message
       });
+    }
+
+    if (data && id_prom) {
+        const eventId = data.id;
+
+        await supabase.from('event_student').delete().eq('id_event', eventId);
+
+        const options = {
+            hostname: 'localhost',
+            port: 3004,
+            path: `/students/promotion/${id_prom}`,
+            method: 'GET',
+        };
+
+        const req = http.request(options, (res) => {
+            let studentData = '';
+            res.on('data', (chunk) => {
+                studentData += chunk;
+            });
+            res.on('end', async () => {
+                if (res.statusCode === 200) {
+                    const students = JSON.parse(studentData).data;
+                    if (students && students.length > 0) {
+                        const studentEventInserts = students.map(student => ({
+                            id_student: student.profile.id_user, // Make sure this is the correct student identifier
+                            id_event: eventId,
+                        }));
+
+                        const { error: insertError } = await supabase
+                            .from('event_student')
+                            .insert(studentEventInserts);
+
+                        if (insertError) {
+                            console.error("Error batch inserting students into event on update:", insertError);
+                        }
+                    }
+                } else {
+                     console.error(`Failed to get students from profile-service on update. Status: ${res.statusCode}`);
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            console.error(`Problem with request to profile-service on update: ${e.message}`);
+        });
+
+        req.end();
     }
 
     res.status(200).json({
@@ -570,11 +682,38 @@ router.patch('/events/:id', async (req, res) => {
 router.delete('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const eventId = parseInt(id, 10);
+
+    if (isNaN(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid event ID provided'
+      });
+    }
+
+    // First, delete related records in event_student
+    console.log(`[Event Service] Attempting to delete student registrations for event ID: ${eventId}`);
+    const { data: deletedStudentData, error: deleteStudentError } = await supabase
+      .from('event_student')
+      .delete()
+      .eq('id_event', eventId)
+      .select();
+
+    console.log('[Event Service] Result of deleting from event_student:', { data: deletedStudentData, count: deletedStudentData?.length, error: deleteStudentError });
+
+    if (deleteStudentError) {
+      console.error('Error deleting student events:', deleteStudentError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete student registrations for the event',
+        error: deleteStudentError.message
+      });
+    }
 
     const { data: existingUser, error: checkError } = await supabase
       .from('event')
       .select('*')
-      .eq('id', id)
+      .eq('id', eventId)
       .single();
 
     if (checkError) {
@@ -596,7 +735,7 @@ router.delete('/events/:id', async (req, res) => {
     const { error } = await supabase
       .from('event')
       .delete()
-      .eq('id', id);
+      .eq('id', eventId);
 
     if (error) {
       console.error('Error deleting event:', error);
