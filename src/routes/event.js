@@ -344,7 +344,7 @@ router.post("/events", async (req, res) => {
           location: req.body.location || null,
           slot_duration: req.body.slot_duration || 30,
           allow_multiple_users: req.body.allow_multiple_users || false,
-          target_promotions: target_promotions || [],
+          target_promotions: target_promotions, // Garde null si c'est null, ou le tableau si fourni
           slots: req.body.slots || [],
         },
       ])
@@ -383,6 +383,34 @@ router.post("/events", async (req, res) => {
 
 // Helper function to assign students to an event
 async function assignStudentsToEvent(eventId, targetPromotions) {
+  // Cas où l'événement est pour TOUT LE MONDE
+  if (targetPromotions === null) {
+    console.log(`[Event Service] Event ${eventId} is for all students. Fetching all active students.`);
+    try {
+      const allStudents = await getAllActiveStudents();
+      if (allStudents && allStudents.length > 0) {
+        const studentEventInserts = allStudents.map(student => ({
+          id_student: student.id_user, // Assurer que c'est le bon ID utilisateur
+          id_event: eventId,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('event_student')
+          .insert(studentEventInserts, { onConflict: ['id_student', 'id_event'] });
+
+        if (insertError) {
+          console.error(`[Event Service] Error batch inserting all students for event ${eventId}:`, insertError);
+        } else {
+          console.log(`[Event Service] Successfully assigned event ${eventId} to ${allStudents.length} students.`);
+        }
+      }
+    } catch (error) {
+      console.error(`[Event Service] Failed to fetch or process all students for event ${eventId}:`, error);
+    }
+    return; // Fin de la fonction pour ce cas
+  }
+
+  // Cas où l'événement cible des promotions spécifiques
   if (!targetPromotions || targetPromotions.length === 0) {
     console.log(`[Event Service] No target promotions for event ${eventId}, skipping student assignment.`);
     return;
@@ -456,6 +484,48 @@ function getStudentsByPromotion(promotionId) {
 
     req.on('error', (e) => {
       console.error(`[Event Service] Request to profile-service failed: ${e.message}`);
+      reject(e);
+    });
+
+    req.end();
+  });
+}
+
+// Helper function to fetch ALL active students from profile-service
+function getAllActiveStudents() {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 3004,
+      path: `/students/active`, // Nouvelle route à créer dans profile-service
+      method: 'GET',
+    };
+
+    console.log(`[Event Service] Calling profile-service to get all active students.`);
+
+    const req = http.request(options, (res) => {
+      let studentData = '';
+      res.on('data', (chunk) => {
+        studentData += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const parsedData = JSON.parse(studentData);
+            resolve(parsedData.data || []);
+          } catch (e) {
+            console.error("[Event Service] Error parsing JSON from profile-service (all students):", e);
+            reject(new Error("Invalid JSON response from profile-service"));
+          }
+        } else {
+           console.error(`[Event Service] Profile-service (all students) returned status ${res.statusCode}: ${studentData}`);
+           resolve([]);
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      console.error(`[Event Service] Request to profile-service (all students) failed: ${e.message}`);
       reject(e);
     });
 
