@@ -13,11 +13,18 @@ app.use(cors({
 }));
 app.use(express.json());
 
-const eventRoutes = require('./routes/event');
-const eventStudentRoutes = require('./routes/event-student');
+const eventRoutes = require('./routes/event/event.js');
+const eventMiscRoutes = require('./routes/event/misc/misc.js');
+
+const eventStudentRoutes = require('./routes/eventStudents/event-student.js');
+const eventStudentMiscRoutes = require('./routes/eventStudents/misc/misc.js');
+
 
 app.use('', eventRoutes)
+app.use('', eventMiscRoutes)
 app.use('', eventStudentRoutes)
+app.use('', eventStudentMiscRoutes)
+
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
