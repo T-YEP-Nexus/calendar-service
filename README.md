@@ -1,56 +1,56 @@
-# Calendar Microservice
+# Microservice Calendrier
 
-This microservice manages calendar events and event-student relationships. It provides CRUD operations on `event` and `event_student` tables.
-
----
-
-## API Routes
-
-### Event-Student Routes
-
-| Method | Endpoint                         | Description                                  |
-|--------|---------------------------------|----------------------------------------------|
-| GET    | `/event-students`               | Get all event-students                        |
-| GET    | `/event-students/:id`           | Get event-student by ID                       |
-| GET    | `/event-students/student/:id_student` | Get event-students by student ID              |
-| POST   | `/event-students`               | Create new event-student (assign student to event) |
-| PATCH  | `/event-students/:id`           | Update event-student                          |
-| DELETE | `/event-students/:id`           | Delete event-student                          |
+Ce microservice gère les événements du calendrier et les relations entre événements et étudiants. Il fournit des opérations CRUD sur les tables `event` et `event_student`.
 
 ---
 
-### Event Routes
+## Routes API
 
-| Method | Endpoint           | Description                         |
-|--------|--------------------|-----------------------------------|
-| GET    | `/events`          | Get all events                    |
-| GET    | `/events/:id`      | Get event by ID                  |
-| GET    | `/events/type/:type` | Get events filtered by event type  |
-| POST   | `/events`          | Create a new event                |
-| PATCH  | `/events/:id`      | Update an event                  |
-| DELETE | `/events/:id`      | Delete an event                  |
+### Routes Event-Student
 
----
-
-## API Description
-
-- **Event-Student**: Manage relationships assigning students to events.
-  - Creating prevents duplicates for the same student-event pair.
-  - Validates UUID formats for student IDs.
-  - Supports filtering by student ID.
-
-- **Event**: Manage events with detailed info including:
-  - Title, date/time, duration, description, event type, report, creator ID.
-  - Validations include date/time format, positive duration, allowed event types, and unique event constraints.
-  - Supports filtering by event type (e.g., "follow-up", "kick-off", "keynote", "hub-talk", "other").
-
-- **Update routes** support partial updates with validation on input fields.
-- **Delete routes** confirm existence before deletion.
+| Méthode | Endpoint                         | Description                                     |
+|---------|---------------------------------|-------------------------------------------------|
+| GET     | `/event-students`               | Récupérer tous les event-students              |
+| GET     | `/event-students/:id`           | Récupérer un event-student par ID              |
+| GET     | `/event-students/student/:id_student` | Récupérer les event-students d’un étudiant par ID |
+| POST    | `/event-students`               | Créer un nouvel event-student (assigner un étudiant à un événement) |
+| PATCH   | `/event-students/:id`           | Mettre à jour un event-student                  |
+| DELETE  | `/event-students/:id`           | Supprimer un event-student                      |
 
 ---
 
-## Swagger Documentation
+### Routes Event
 
-Full API docs and interactive testing:
+| Méthode | Endpoint           | Description                             |
+|---------|------------------|-----------------------------------------|
+| GET     | `/events`         | Récupérer tous les événements          |
+| GET     | `/events/:id`     | Récupérer un événement par ID           |
+| GET     | `/events/type/:type` | Récupérer les événements filtrés par type |
+| POST    | `/events`         | Créer un nouvel événement              |
+| PATCH   | `/events/:id`     | Mettre à jour un événement             |
+| DELETE  | `/events/:id`     | Supprimer un événement                 |
 
-**[Calendar Microservice Swagger Documentation](http://localhost:3002/api-docs)**
+---
+
+## Description de l’API
+
+- **Event-Student** : Gère les relations en assignant des étudiants à des événements.
+  - La création empêche les doublons pour une même paire étudiant-événement.
+  - Valide le format UUID pour les IDs des étudiants.
+  - Supporte le filtrage par ID étudiant.
+
+- **Event** : Gère les événements avec des informations détaillées telles que :
+  - Titre, date/heure, durée, description, type d’événement, rapport, ID du créateur.
+  - Les validations incluent le format date/heure, la durée positive, les types d’événement autorisés, et les contraintes d’unicité.
+  - Supporte le filtrage par type d’événement (par exemple : "follow-up", "kick-off", "keynote", "hub-talk", "other").
+
+- Les **routes de mise à jour** supportent les mises à jour partielles avec validation des champs.
+- Les **routes de suppression** vérifient l’existence avant suppression.
+
+---
+
+## Documentation Swagger
+
+Documentation complète de l’API et tests interactifs :
+
+**[Documentation Swagger du Microservice Calendrier](http://localhost:3002/api-docs)**
