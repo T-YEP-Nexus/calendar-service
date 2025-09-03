@@ -24,7 +24,7 @@ cp .env.example .env
 
 | Variable | Description | Valeur Exemple | Obligatoire |
 |----------|-------------|----------------|-------------|
-| `PORT` | Port d'écoute du service | `3002` | ✅ |
+| `PORT` | Port d'écoute du service | `3002` | ❌ |
 | `NODE_ENV` | Environnement d'exécution | `development` | ✅ |
 | `SUPABASE_URL` | URL de votre instance Supabase | `https://xxx.supabase.co` | ✅ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé de service Supabase (admin) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` | ✅ |
