@@ -460,18 +460,7 @@ router.get("/events/:eventId/students", async (req, res) => {
       .select(`
         id,
         id_student,
-        created_at,
-        student:student(
-          id,
-          student_number,
-          major,
-          profile:user-profile(
-            id,
-            first_name,
-            last_name,
-            email:user(email)
-          )
-        )
+        created_at
       `)
       .eq("id_event", eventIdInt);
 
@@ -484,35 +473,31 @@ router.get("/events/:eventId/students", async (req, res) => {
       });
     }
 
+    // Vérifier que nous avons des données
+    if (!data || data.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No students registered for this event",
+        data: [],
+      });
+    }
+
     // Formater les données pour le frontend
     const formattedStudents = data.map(item => ({
       registration_id: item.id,
       student_id: item.id_student,
-      registered_at: item.created_at,
-      student: {
-        id: item.student.id,
-        student_number: item.student.student_number,
-        major: item.student.major,
-        profile: {
-          id: item.student.profile.id,
-          first_name: item.student.profile.first_name,
-          last_name: item.student.profile.last_name,
-          email: item.student.profile.email
-        }
-      }
+      registered_at: item.created_at
     }));
 
     res.status(200).json({
       success: true,
       message: "Event students retrieved successfully",
-      data: {
-        event: {
-          id: existingEvent.id,
-          title: existingEvent.title
-        },
-        students: formattedStudents,
-        count: formattedStudents.length
-      }
+      data: formattedStudents,
+      event: {
+        id: existingEvent.id,
+        title: existingEvent.title
+      },
+      count: formattedStudents.length
     });
   } catch (err) {
     console.error("Unexpected error:", err);
