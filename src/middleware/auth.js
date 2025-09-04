@@ -5,7 +5,8 @@ const jwt = require("jsonwebtoken");
 // - Vérifie le JWT avec JWT_SECRET
 // - Attache le payload décodé à req.user
 // - Renvoie 401 si manquant/invalid/expiré
-module.exports = function authMiddleware(req, res, next) {
+// - Pour /api-docs, vérifie que l'utilisateur est admin (rôle dans le token)
+module.exports = async function authMiddleware(req, res, next) {
   // Toutes les routes nécessitent une authentification
 
   try {
@@ -27,6 +28,17 @@ module.exports = function authMiddleware(req, res, next) {
 
     const decoded = jwt.verify(token, secret);
     req.user = decoded;
+
+    // Vérification spéciale pour /api-docs : nécessite le rôle admin
+    if (req.path.startsWith("/api-docs")) {
+      if (decoded.role !== "admin") {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: admin access required",
+        });
+      }
+    }
+
     return next();
   } catch (err) {
     return res.status(401).json({
