@@ -38,7 +38,6 @@ router.get("/events/student/:studentId", async (req, res) => {
   try {
     const { studentId } = req.params;
 
-    // Valider que l'ID de l'étudiant est un UUID valide
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!studentId || !uuidRegex.test(studentId)) {
       return res.status(400).json({
@@ -47,7 +46,6 @@ router.get("/events/student/:studentId", async (req, res) => {
       });
     }
 
-    // Récupérer tous les événements auxquels l'étudiant est inscrit
     const { data, error } = await supabase
       .from("event_student")
       .select(`
@@ -85,14 +83,11 @@ router.get("/events/student/:studentId", async (req, res) => {
       });
     }
 
-    // Formater les données pour le frontend
     const formattedEvents = data.map(item => ({
       id: item.event.id,
       title: item.event.title,
-      // Source de vérité attendue par le frontend
       event_datetime: item.event.event_datetime,
       duration_minutes: item.event.duration_minutes,
-      // Compatibilité (le frontend n'en dépend plus mais on les expose)
       start: item.event.event_datetime,
       end: new Date(new Date(item.event.event_datetime).getTime() + item.event.duration_minutes * 60000).toISOString(),
       description: item.event.description,
@@ -184,7 +179,6 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
       });
     }
     
-    // Vérifier que l'événement existe et récupérer ses slots
     const { data: event, error: eventError } = await supabase
       .from("event")
       .select("id, title, slots")
@@ -198,7 +192,6 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
       });
     }
     
-    // Vérifier que le slot existe
     if (!event.slots || !Array.isArray(event.slots) || slotIndexInt >= event.slots.length) {
       return res.status(404).json({
         success: false,
@@ -206,7 +199,6 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
       });
     }
     
-    // Vérifier que le slot n'est pas déjà occupé
     if (event.slots[slotIndexInt].user) {
       return res.status(409).json({
         success: false,
@@ -214,7 +206,6 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
       });
     }
     
-    // Vérifier que l'étudiant n'a pas déjà un autre slot dans cet événement
     const existingSlotIndex = event.slots.findIndex(slot => slot.user === id_student);
     if (existingSlotIndex >= 0) {
       return res.status(409).json({
@@ -223,14 +214,12 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
       });
     }
     
-    // Mettre à jour le slot avec l'ID de l'étudiant
     const updatedSlots = [...event.slots];
     updatedSlots[slotIndexInt] = {
       ...updatedSlots[slotIndexInt],
       user: id_student
     };
     
-    // Sauvegarder dans la base de données
     const { data: updatedEvent, error: updateError } = await supabase
       .from("event")
       .update({ slots: updatedSlots })
@@ -331,7 +320,6 @@ router.delete("/events/:eventId/slots/:slotIndex/unregister", async (req, res) =
       });
     }
     
-    // Vérifier que l'événement existe et récupérer ses slots
     const { data: event, error: eventError } = await supabase
       .from("event")
       .select("id, title, slots")
@@ -345,7 +333,6 @@ router.delete("/events/:eventId/slots/:slotIndex/unregister", async (req, res) =
       });
     }
     
-    // Vérifier que le slot existe
     if (!event.slots || !Array.isArray(event.slots) || slotIndexInt >= event.slots.length) {
       return res.status(404).json({
         success: false,
@@ -353,7 +340,6 @@ router.delete("/events/:eventId/slots/:slotIndex/unregister", async (req, res) =
       });
     }
     
-    // Vérifier que l'étudiant est bien inscrit à ce slot
     if (event.slots[slotIndexInt].user !== id_student) {
       return res.status(403).json({
         success: false,
@@ -361,14 +347,12 @@ router.delete("/events/:eventId/slots/:slotIndex/unregister", async (req, res) =
       });
     }
     
-    // Libérer le slot
     const updatedSlots = [...event.slots];
     updatedSlots[slotIndexInt] = {
       ...updatedSlots[slotIndexInt],
       user: null
     };
     
-    // Sauvegarder dans la base de données
     const { data: updatedEvent, error: updateError } = await supabase
       .from("event")
       .update({ slots: updatedSlots })
@@ -440,7 +424,6 @@ router.get("/events/:eventId/students", async (req, res) => {
       });
     }
 
-    // Vérifier que l'événement existe
     const { data: existingEvent, error: eventCheckError } = await supabase
       .from("event")
       .select("id, title")
@@ -454,7 +437,6 @@ router.get("/events/:eventId/students", async (req, res) => {
       });
     }
 
-    // Récupérer tous les étudiants inscrits à cet événement
     const { data, error } = await supabase
       .from("event_student")
       .select(`
@@ -473,7 +455,6 @@ router.get("/events/:eventId/students", async (req, res) => {
       });
     }
 
-    // Vérifier que nous avons des données
     if (!data || data.length === 0) {
       return res.status(200).json({
         success: true,
@@ -482,7 +463,6 @@ router.get("/events/:eventId/students", async (req, res) => {
       });
     }
 
-    // Formater les données pour le frontend
     const formattedStudents = data.map(item => ({
       registration_id: item.id,
       student_id: item.id_student,

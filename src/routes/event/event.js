@@ -87,7 +87,6 @@ router.get("/events/:id", async (req, res) => {
       .single();
 
     if (error) {
-      // PGRST116 means no rows found, which is a valid 404 case.
       if (error.code === "PGRST116") {
         return res.status(404).json({
           success: false,
@@ -189,7 +188,7 @@ router.post("/events", async (req, res) => {
       });
     }
 
-    const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/; // ISO String format
+    const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/;
     if (!dateTimeRegex.test(event_datetime)) {
       return res.status(400).json({
         success: false,
@@ -270,7 +269,7 @@ router.post("/events", async (req, res) => {
           location: req.body.location || null,
           slot_duration: req.body.slot_duration || 30,
           allow_multiple_users: req.body.allow_multiple_users || false,
-          target_promotions: target_promotions, // Garde null si c'est null, ou le tableau si fourni
+          target_promotions: target_promotions,
           slots: req.body.slots || [],
         },
       ])
@@ -286,7 +285,6 @@ router.post("/events", async (req, res) => {
       });
     }
 
-    // Assign students using the helper function
     if (data) {
       console.log(`[Event Service] Created event ${data.id}, now assigning students...`);
       console.log(`[Event Service] target_promotions value:`, target_promotions);
@@ -314,25 +312,21 @@ router.post("/events", async (req, res) => {
   }
 });
 
-// Helper function to assign students to an event
 async function assignStudentsToEvent(eventId, targetPromotions, req) {
   console.log(`[Event Service] Assigning students to event ${eventId}...`);
   
   try {
     let students = [];
     
-    // Cas 1: Événement pour TOUT LE MONDE (target_promotions = null, undefined, ou tableau vide)
     if (targetPromotions === null || targetPromotions === undefined || (Array.isArray(targetPromotions) && targetPromotions.length === 0)) {
       console.log(`[Event Service] Event ${eventId} is for all students.`);
       console.log(`[Event Service] Calling getAllActiveStudents...`);
       students = await getAllActiveStudents(req);
       console.log(`[Event Service] getAllActiveStudents returned ${students?.length || 0} students`);
     }
-    // Cas 2: Événement pour promotions spécifiques
     else if (targetPromotions && targetPromotions.length > 0) {
       console.log(`[Event Service] Event ${eventId} is for specific promotions: ${targetPromotions.join(', ')}`);
       
-      // Récupérer tous les étudiants des promotions spécifiées
       for (const promotionId of targetPromotions) {
         try {
           const promotionStudents = await getStudentsByPromotion(promotionId, req);
@@ -345,29 +339,24 @@ async function assignStudentsToEvent(eventId, targetPromotions, req) {
         }
       }
     }
-    // Cas 3: Cas inattendu - ne rien faire
     else {
       console.log(`[Event Service] Unexpected target_promotions value for event ${eventId}:`, targetPromotions);
       return;
     }
 
-    // Insérer les étudiants dans event_student
     if (students && students.length > 0) {
       console.log(`[Event Service] Sample student data structure:`, JSON.stringify(students[0], null, 2));
       
-      // Récupérer les vrais id_user (UUID) depuis le profile-service
       const studentEventInserts = [];
       
       for (const student of students) {
         try {
           let studentUuid = null;
 
-          // Cas 1: Si c'est déjà un user-profile avec id_user (de /students/active)
           if (student.id_user) {
             studentUuid = student.id_user;
             console.log(`[Event Service] Direct UUID from user-profile: ${studentUuid}`);
           }
-          // Cas 2: Si c'est un student avec id_user_profile (de /students)
           else if (student.id_user_profile) {
             const profileData = await getProfileById(student.id_user_profile, req);
             if (profileData && profileData.id_user) {
@@ -390,7 +379,6 @@ async function assignStudentsToEvent(eventId, targetPromotions, req) {
       }
 
       if (studentEventInserts.length > 0) {
-        // Éviter les doublons en vérifiant d'abord les assignations existantes
         const existingAssignments = [];
         for (const insert of studentEventInserts) {
           const { data: existing } = await supabase
@@ -430,11 +418,10 @@ async function assignStudentsToEvent(eventId, targetPromotions, req) {
   }
 }
 
-// Helper function to fetch profile by ID from profile-service
 function getProfileById(profileId, req) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'localhost',
+      hostname: 'profile-service',
       port: 3004,
       path: `/profile/${profileId}`,
       method: 'GET',
@@ -474,17 +461,16 @@ function getProfileById(profileId, req) {
   });
 }
 
-// Helper function to fetch students from profile-service
 function getStudentsByPromotion(promotionId, req) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'localhost',
+      hostname: 'profile-service',
       port: 3004,
       path: `/students/promotion/${promotionId}`,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': req.headers.cookie || '', // Transmettre les cookies du frontend
+        'Cookie': req.headers.cookie || '', 
       },
     };
 
@@ -506,7 +492,6 @@ function getStudentsByPromotion(promotionId, req) {
           }
         } else {
            console.error(`[Event Service] Profile-service returned status ${res.statusCode}: ${studentData}`);
-           // Resolve with empty array to not block other promotions
            resolve([]);
         }
       });
@@ -521,17 +506,16 @@ function getStudentsByPromotion(promotionId, req) {
   });
 }
 
-// Helper function to fetch ALL active students from profile-service
 function getAllActiveStudents(req) {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: 'localhost',
+      hostname: 'profile-service',
       port: 3004,
       path: `/students/active`,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': req.headers?.cookie || '', // Transmettre les cookies du frontend
+        'Cookie': req.headers?.cookie || '',
       },
     };
 
@@ -553,7 +537,7 @@ function getAllActiveStudents(req) {
             } catch (e) {
               console.error("[Event Service] Error parsing JSON from profile-service (all students):", e);
               console.error("[Event Service] Raw data:", studentData);
-              resolve([]); // Résoudre avec un tableau vide au lieu de rejeter
+              resolve([]);
             }
           } else {
              console.error(`[Event Service] Profile-service (all students) returned status ${res.statusCode}: ${studentData}`);
@@ -565,7 +549,7 @@ function getAllActiveStudents(req) {
       httpReq.on('error', (e) => {
         console.error(`[Event Service] Request to profile-service (all students) failed: ${e.message}`);
         console.error(`[Event Service] Error details:`, e);
-        resolve([]); // Résoudre avec un tableau vide au lieu de rejeter
+        resolve([]); 
       });
 
       httpReq.end();
@@ -627,12 +611,10 @@ router.patch('/events/:id', async (req, res) => {
       event_type, 
       report, 
       id_prom,
-      // NOUVELLES COLONNES :
       location,
       slot_duration,
       allow_multiple_users,
       target_promotions,
-      // AJOUTER SLOTS :
       slots
     } = req.body;
 
@@ -682,7 +664,7 @@ router.patch('/events/:id', async (req, res) => {
     }
 
     if (event_datetime) {
-        const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/; // ISO String format
+        const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/; 
         if (!dateTimeRegex.test(event_datetime)) {
         return res.status(400).json({
             success: false,
@@ -734,7 +716,6 @@ router.patch('/events/:id', async (req, res) => {
         updateData.id_prom = id_prom;
     }
 
-    // GESTION DES NOUVELLES COLONNES :
     if (location !== undefined) {
         updateData.location = location;
     }
@@ -757,7 +738,6 @@ router.patch('/events/:id', async (req, res) => {
         updateData.target_promotions = target_promotions;
     }
 
-    // AJOUTER LA GESTION DES SLOTS :
     if (slots !== undefined) {
         updateData.slots = slots;
     }
@@ -785,23 +765,18 @@ router.patch('/events/:id', async (req, res) => {
       });
     }
 
-    // Réassigner les étudiants si target_promotions a été modifié
     if (data && target_promotions !== undefined) {
         const eventId = data.id;
 
         console.log(`[Event Service] Event ${eventId} updated. Now updating student assignments.`);
         console.log(`[Event Service] New target_promotions:`, target_promotions);
 
-        // Supprimer toutes les anciennes assignations d'étudiants pour cet événement
         const { error: deleteError } = await supabase.from('event_student').delete().eq('id_event', eventId);
         if (deleteError) {
             console.error(`[Event Service] Failed to delete old assignments for event ${eventId}:`, deleteError);
-            // We can decide to continue or to stop. For now, let's continue.
         } else {
             console.log(`[Event Service] Deleted old assignments for event ${eventId}`);
         }
-
-        // Assigner les nouveaux étudiants en utilisant la fonction helper
         await assignStudentsToEvent(eventId, target_promotions, req);
     }
 
@@ -852,10 +827,6 @@ router.delete('/events/:id', async (req, res) => {
       });
     }
 
-    // Supabase will handle cascade delete if configured in the database schema.
-    // If not, manual deletion is required. Let's ensure manual deletion is robust.
-
-    // 1. Delete related records in event_student
     const { error: deleteStudentError } = await supabase
       .from('event_student')
       .delete()
@@ -870,7 +841,6 @@ router.delete('/events/:id', async (req, res) => {
       });
     }
 
-    // 2. Delete the event itself
     const { data: deletedEvent, error: deleteEventError } = await supabase
       .from('event')
       .delete()
@@ -879,7 +849,7 @@ router.delete('/events/:id', async (req, res) => {
       .single();
 
     if (deleteEventError) {
-      if (deleteEventError.code === 'PGRST116') { // No event found to delete
+      if (deleteEventError.code === 'PGRST116') {
         return res.status(404).json({
           success: false,
           message: 'Event not found'
@@ -911,8 +881,5 @@ router.delete('/events/:id', async (req, res) => {
   }
 });
 
-
-
-// (route dupliquée supprimée)
 
 module.exports = router;

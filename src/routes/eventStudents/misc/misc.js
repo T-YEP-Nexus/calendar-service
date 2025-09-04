@@ -46,7 +46,6 @@ router.get("/agenda/student/:id_student", async (req, res) => {
       });
     }
 
-    // 1. Get all event_student entries for the student
     const { data: studentEvents, error: studentEventsError } = await supabase
       .from("event_student")
       .select("id_event")
@@ -69,10 +68,8 @@ router.get("/agenda/student/:id_student", async (req, res) => {
       });
     }
 
-    // 2. Extract event IDs
     const eventIds = studentEvents.map((se) => se.id_event);
 
-    // 3. Fetch full details for those event IDs
     const { data: events, error: eventsError } = await supabase
       .from("event")
       .select("*")
