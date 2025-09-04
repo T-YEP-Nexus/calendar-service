@@ -24,7 +24,6 @@ const eventMiscRoutes = require("./routes/event/misc/misc.js");
 const eventStudentRoutes = require("./routes/eventStudents/event-student.js");
 const eventStudentMiscRoutes = require("./routes/eventStudents/misc/misc.js");
 
-// Protéger toutes les routes (sauf /api-docs) via middleware d'auth
 app.use(auth);
 
 app.use("", eventRoutes);
