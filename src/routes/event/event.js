@@ -288,7 +288,14 @@ router.post("/events", async (req, res) => {
 
     // Assign students using the helper function
     if (data) {
-      await assignStudentsToEvent(data.id, target_promotions);
+      console.log(`[Event Service] Created event ${data.id}, now assigning students...`);
+      console.log(`[Event Service] target_promotions value:`, target_promotions);
+      try {
+        await assignStudentsToEvent(data.id, target_promotions, req);
+        console.log(`[Event Service] Student assignment completed for event ${data.id}`);
+      } catch (error) {
+        console.error(`[Event Service] Error during student assignment:`, error);
+      }
     }
 
 
@@ -308,85 +315,182 @@ router.post("/events", async (req, res) => {
 });
 
 // Helper function to assign students to an event
-async function assignStudentsToEvent(eventId, targetPromotions) {
-  // Cas où l'événement est pour TOUT LE MONDE
-  if (targetPromotions === null) {
-    console.log(`[Event Service] Event ${eventId} is for all students. Fetching all active students.`);
-    try {
-      const allStudents = await getAllActiveStudents();
-      if (allStudents && allStudents.length > 0) {
-        const studentEventInserts = allStudents.map(student => ({
-          id_student: student.id_user, // Assurer que c'est le bon ID utilisateur
-          id_event: eventId,
-        }));
-
-        const { error: insertError } = await supabase
-          .from('event_student')
-          .insert(studentEventInserts, { onConflict: ['id_student', 'id_event'] });
-
-        if (insertError) {
-          console.error(`[Event Service] Error batch inserting all students for event ${eventId}:`, insertError);
-        } else {
-          console.log(`[Event Service] Successfully assigned event ${eventId} to ${allStudents.length} students.`);
+async function assignStudentsToEvent(eventId, targetPromotions, req) {
+  console.log(`[Event Service] Assigning students to event ${eventId}...`);
+  
+  try {
+    let students = [];
+    
+    // Cas 1: Événement pour TOUT LE MONDE (target_promotions = null, undefined, ou tableau vide)
+    if (targetPromotions === null || targetPromotions === undefined || (Array.isArray(targetPromotions) && targetPromotions.length === 0)) {
+      console.log(`[Event Service] Event ${eventId} is for all students.`);
+      console.log(`[Event Service] Calling getAllActiveStudents...`);
+      students = await getAllActiveStudents(req);
+      console.log(`[Event Service] getAllActiveStudents returned ${students?.length || 0} students`);
+    }
+    // Cas 2: Événement pour promotions spécifiques
+    else if (targetPromotions && targetPromotions.length > 0) {
+      console.log(`[Event Service] Event ${eventId} is for specific promotions: ${targetPromotions.join(', ')}`);
+      
+      // Récupérer tous les étudiants des promotions spécifiées
+      for (const promotionId of targetPromotions) {
+        try {
+          const promotionStudents = await getStudentsByPromotion(promotionId, req);
+          if (promotionStudents && promotionStudents.length > 0) {
+            students = students.concat(promotionStudents);
+            console.log(`[Event Service] Found ${promotionStudents.length} students in promotion ${promotionId}`);
+          }
+        } catch (error) {
+          console.error(`[Event Service] Error fetching students for promotion ${promotionId}:`, error);
         }
       }
-    } catch (error) {
-      console.error(`[Event Service] Failed to fetch or process all students for event ${eventId}:`, error);
     }
-    return; // Fin de la fonction pour ce cas
-  }
+    // Cas 3: Cas inattendu - ne rien faire
+    else {
+      console.log(`[Event Service] Unexpected target_promotions value for event ${eventId}:`, targetPromotions);
+      return;
+    }
 
-  // Cas où l'événement cible des promotions spécifiques
-  if (!targetPromotions || targetPromotions.length === 0) {
-    console.log(`[Event Service] No target promotions for event ${eventId}, skipping student assignment.`);
-    return;
-  }
+    // Insérer les étudiants dans event_student
+    if (students && students.length > 0) {
+      console.log(`[Event Service] Sample student data structure:`, JSON.stringify(students[0], null, 2));
+      
+      // Récupérer les vrais id_user (UUID) depuis le profile-service
+      const studentEventInserts = [];
+      
+      for (const student of students) {
+        try {
+          let studentUuid = null;
 
-  console.log(`[Event Service] Assigning students to event ${eventId} from promotions: ${targetPromotions.join(', ')}`);
+          // Cas 1: Si c'est déjà un user-profile avec id_user (de /students/active)
+          if (student.id_user) {
+            studentUuid = student.id_user;
+            console.log(`[Event Service] Direct UUID from user-profile: ${studentUuid}`);
+          }
+          // Cas 2: Si c'est un student avec id_user_profile (de /students)
+          else if (student.id_user_profile) {
+            const profileData = await getProfileById(student.id_user_profile, req);
+            if (profileData && profileData.id_user) {
+              studentUuid = profileData.id_user;
+              console.log(`[Event Service] Found UUID via profile lookup ${student.id_user_profile}: ${studentUuid}`);
+            }
+          }
 
-  for (const promotionId of targetPromotions) {
-    try {
-      const students = await getStudentsByPromotion(promotionId);
+          if (studentUuid) {
+            studentEventInserts.push({
+              id_student: studentUuid,
+              id_event: eventId,
+            });
+          } else {
+            console.error(`[Event Service] Could not find UUID for student:`, student);
+          }
+        } catch (error) {
+          console.error(`[Event Service] Error processing student:`, error);
+        }
+      }
 
-      if (students && students.length > 0) {
-        const studentEventInserts = students.map(student => ({
-          id_student: student.profile.id_user,
-          id_event: eventId,
-        }));
+      if (studentEventInserts.length > 0) {
+        // Éviter les doublons en vérifiant d'abord les assignations existantes
+        const existingAssignments = [];
+        for (const insert of studentEventInserts) {
+          const { data: existing } = await supabase
+            .from('event_student')
+            .select('id')
+            .eq('id_student', insert.id_student)
+            .eq('id_event', insert.id_event)
+            .single();
+          
+          if (!existing) {
+            existingAssignments.push(insert);
+          }
+        }
 
-        console.log(`[Event Service] Preparing to insert ${studentEventInserts.length} students for promotion ${promotionId}.`);
+        if (existingAssignments.length > 0) {
+          const { error: insertError } = await supabase
+            .from('event_student')
+            .insert(existingAssignments);
 
-        const { error: insertError } = await supabase
-          .from('event_student')
-          .insert(studentEventInserts, { onConflict: ['id_student', 'id_event'] }); // Ignore duplicates
-
-        if (insertError) {
-          console.error(`[Event Service] Error batch inserting students for promotion ${promotionId}:`, insertError);
+          if (insertError) {
+            console.error(`[Event Service] Error inserting students for event ${eventId}:`, insertError);
+          } else {
+            console.log(`[Event Service] Successfully assigned event ${eventId} to ${existingAssignments.length} new students.`);
+          }
         } else {
-          console.log(`[Event Service] Successfully processed ${studentEventInserts.length} students for promotion ${promotionId}.`);
+          console.log(`[Event Service] All students already assigned to event ${eventId}.`);
         }
       } else {
-        console.log(`[Event Service] No students found for promotion ${promotionId}.`);
+        console.log(`[Event Service] No valid students found for event ${eventId}.`);
       }
-    } catch (error) {
-      console.error(`[Event Service] Failed to process promotion ${promotionId}:`, error);
+    } else {
+      console.log(`[Event Service] No students found for event ${eventId}.`);
     }
+    
+  } catch (error) {
+    console.error(`[Event Service] Failed to assign students to event ${eventId}:`, error);
   }
 }
 
+// Helper function to fetch profile by ID from profile-service
+function getProfileById(profileId, req) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 3004,
+      path: `/profile/${profileId}`,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': req.headers.cookie || '',
+      },
+    };
+
+    const httpReq = http.request(options, (res) => {
+      let profileData = '';
+      res.on('data', (chunk) => {
+        profileData += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const parsedData = JSON.parse(profileData);
+            resolve(parsedData.data || null);
+          } catch (e) {
+            console.error("[Event Service] Error parsing JSON from profile-service (profile):", e);
+            reject(new Error("Invalid JSON response from profile-service"));
+          }
+        } else {
+           console.error(`[Event Service] Profile-service (profile) returned status ${res.statusCode}: ${profileData}`);
+           resolve(null);
+        }
+      });
+    });
+
+    httpReq.on('error', (e) => {
+      console.error(`[Event Service] Request to profile-service (profile) failed: ${e.message}`);
+      reject(e);
+    });
+
+    httpReq.end();
+  });
+}
+
 // Helper function to fetch students from profile-service
-function getStudentsByPromotion(promotionId) {
+function getStudentsByPromotion(promotionId, req) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'localhost',
       port: 3004,
       path: `/students/promotion/${promotionId}`,
       method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': req.headers.cookie || '', // Transmettre les cookies du frontend
+      },
     };
 
     console.log(`[Event Service] Calling profile-service for promotion ${promotionId}`);
 
-    const req = http.request(options, (res) => {
+    const httpReq = http.request(options, (res) => {
       let studentData = '';
       res.on('data', (chunk) => {
         studentData += chunk;
@@ -408,54 +512,67 @@ function getStudentsByPromotion(promotionId) {
       });
     });
 
-    req.on('error', (e) => {
+    httpReq.on('error', (e) => {
       console.error(`[Event Service] Request to profile-service failed: ${e.message}`);
       reject(e);
     });
 
-    req.end();
+    httpReq.end();
   });
 }
 
 // Helper function to fetch ALL active students from profile-service
-function getAllActiveStudents() {
+function getAllActiveStudents(req) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'localhost',
       port: 3004,
-      path: `/students/active`, // Nouvelle route à créer dans profile-service
+      path: `/students/active`,
       method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': req.headers?.cookie || '', // Transmettre les cookies du frontend
+      },
     };
 
-    console.log(`[Event Service] Calling profile-service to get all active students.`);
+    console.log(`[Event Service] Calling profile-service at http://localhost:3004/students/active`);
+    console.log(`[Event Service] Request headers:`, options.headers);
 
-    const req = http.request(options, (res) => {
-      let studentData = '';
-      res.on('data', (chunk) => {
-        studentData += chunk;
-      });
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const parsedData = JSON.parse(studentData);
-            resolve(parsedData.data || []);
-          } catch (e) {
-            console.error("[Event Service] Error parsing JSON from profile-service (all students):", e);
-            reject(new Error("Invalid JSON response from profile-service"));
+    try {
+      const httpReq = http.request(options, (res) => {
+        let studentData = '';
+        res.on('data', (chunk) => {
+          studentData += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const parsedData = JSON.parse(studentData);
+              console.log(`[Event Service] Profile-service returned ${parsedData.data?.length || 0} active students`);
+              resolve(parsedData.data || []);
+            } catch (e) {
+              console.error("[Event Service] Error parsing JSON from profile-service (all students):", e);
+              console.error("[Event Service] Raw data:", studentData);
+              resolve([]); // Résoudre avec un tableau vide au lieu de rejeter
+            }
+          } else {
+             console.error(`[Event Service] Profile-service (all students) returned status ${res.statusCode}: ${studentData}`);
+             resolve([]);
           }
-        } else {
-           console.error(`[Event Service] Profile-service (all students) returned status ${res.statusCode}: ${studentData}`);
-           resolve([]);
-        }
+        });
       });
-    });
 
-    req.on('error', (e) => {
-      console.error(`[Event Service] Request to profile-service (all students) failed: ${e.message}`);
-      reject(e);
-    });
+      httpReq.on('error', (e) => {
+        console.error(`[Event Service] Request to profile-service (all students) failed: ${e.message}`);
+        console.error(`[Event Service] Error details:`, e);
+        resolve([]); // Résoudre avec un tableau vide au lieu de rejeter
+      });
 
-    req.end();
+      httpReq.end();
+    } catch (error) {
+      console.error(`[Event Service] Unexpected error in getAllActiveStudents:`, error);
+      resolve([]);
+    }
   });
 }
 
@@ -668,20 +785,24 @@ router.patch('/events/:id', async (req, res) => {
       });
     }
 
-    if (data && target_promotions && target_promotions.length > 0) {
+    // Réassigner les étudiants si target_promotions a été modifié
+    if (data && target_promotions !== undefined) {
         const eventId = data.id;
 
         console.log(`[Event Service] Event ${eventId} updated. Now updating student assignments.`);
+        console.log(`[Event Service] New target_promotions:`, target_promotions);
 
         // Supprimer toutes les anciennes assignations d'étudiants pour cet événement
         const { error: deleteError } = await supabase.from('event_student').delete().eq('id_event', eventId);
         if (deleteError) {
             console.error(`[Event Service] Failed to delete old assignments for event ${eventId}:`, deleteError);
             // We can decide to continue or to stop. For now, let's continue.
+        } else {
+            console.log(`[Event Service] Deleted old assignments for event ${eventId}`);
         }
 
         // Assigner les nouveaux étudiants en utilisant la fonction helper
-        await assignStudentsToEvent(eventId, target_promotions);
+        await assignStudentsToEvent(eventId, target_promotions, req);
     }
 
     res.status(200).json({
