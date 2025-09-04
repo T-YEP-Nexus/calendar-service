@@ -344,7 +344,7 @@ router.post("/events", async (req, res) => {
           location: req.body.location || null,
           slot_duration: req.body.slot_duration || 30,
           allow_multiple_users: req.body.allow_multiple_users || false,
-          target_promotions: target_promotions, // Garde null si c'est null, ou le tableau si fourni
+          target_promotions: target_promotions,
           slots: req.body.slots || [],
         },
       ])
@@ -360,7 +360,6 @@ router.post("/events", async (req, res) => {
       });
     }
 
-    // Assign students using the helper function
     if (data) {
       await assignStudentsToEvent(data.id, target_promotions);
     }
@@ -381,7 +380,6 @@ router.post("/events", async (req, res) => {
   }
 });
 
-// Helper function to assign students to an event
 async function assignStudentsToEvent(eventId, targetPromotions) {
   // Cas où l'événement est pour TOUT LE MONDE
   if (targetPromotions === null) {
@@ -407,7 +405,7 @@ async function assignStudentsToEvent(eventId, targetPromotions) {
     } catch (error) {
       console.error(`[Event Service] Failed to fetch or process all students for event ${eventId}:`, error);
     }
-    return; // Fin de la fonction pour ce cas
+    return;
   }
 
   // Cas où l'événement cible des promotions spécifiques
@@ -448,7 +446,6 @@ async function assignStudentsToEvent(eventId, targetPromotions) {
   }
 }
 
-// Helper function to fetch students from profile-service
 function getStudentsByPromotion(promotionId) {
   return new Promise((resolve, reject) => {
     const options = {
@@ -476,7 +473,6 @@ function getStudentsByPromotion(promotionId) {
           }
         } else {
            console.error(`[Event Service] Profile-service returned status ${res.statusCode}: ${studentData}`);
-           // Resolve with empty array to not block other promotions
            resolve([]);
         }
       });
@@ -497,7 +493,7 @@ function getAllActiveStudents() {
     const options = {
       hostname: 'localhost',
       port: 3004,
-      path: `/students/active`, // Nouvelle route à créer dans profile-service
+      path: `/students/active`, 
       method: 'GET',
     };
 
@@ -584,12 +580,10 @@ router.patch('/events/:id', async (req, res) => {
       event_type, 
       report, 
       id_prom,
-      // NOUVELLES COLONNES :
       location,
       slot_duration,
       allow_multiple_users,
       target_promotions,
-      // AJOUTER SLOTS :
       slots
     } = req.body;
 
@@ -691,7 +685,6 @@ router.patch('/events/:id', async (req, res) => {
         updateData.id_prom = id_prom;
     }
 
-    // GESTION DES NOUVELLES COLONNES :
     if (location !== undefined) {
         updateData.location = location;
     }
@@ -714,7 +707,6 @@ router.patch('/events/:id', async (req, res) => {
         updateData.target_promotions = target_promotions;
     }
 
-    // AJOUTER LA GESTION DES SLOTS :
     if (slots !== undefined) {
         updateData.slots = slots;
     }
@@ -751,7 +743,6 @@ router.patch('/events/:id', async (req, res) => {
         const { error: deleteError } = await supabase.from('event_student').delete().eq('id_event', eventId);
         if (deleteError) {
             console.error(`[Event Service] Failed to delete old assignments for event ${eventId}:`, deleteError);
-            // We can decide to continue or to stop. For now, let's continue.
         }
 
         // Assigner les nouveaux étudiants en utilisant la fonction helper
@@ -805,9 +796,6 @@ router.delete('/events/:id', async (req, res) => {
       });
     }
 
-    // Supabase will handle cascade delete if configured in the database schema.
-    // If not, manual deletion is required. Let's ensure manual deletion is robust.
-
     // 1. Delete related records in event_student
     const { error: deleteStudentError } = await supabase
       .from('event_student')
@@ -832,7 +820,7 @@ router.delete('/events/:id', async (req, res) => {
       .single();
 
     if (deleteEventError) {
-      if (deleteEventError.code === 'PGRST116') { // No event found to delete
+      if (deleteEventError.code === 'PGRST116') { 
         return res.status(404).json({
           success: false,
           message: 'Event not found'
@@ -944,7 +932,6 @@ router.get("/events/student/:studentId", async (req, res) => {
       // Source de vérité attendue par le frontend
       event_datetime: item.event.event_datetime,
       duration_minutes: item.event.duration_minutes,
-      // Compatibilité (le frontend n'en dépend plus mais on les expose)
       start: item.event.event_datetime,
       end: new Date(new Date(item.event.event_datetime).getTime() + item.event.duration_minutes * 60000).toISOString(),
       description: item.event.description,
@@ -1375,7 +1362,5 @@ router.get("/events/:eventId/students", async (req, res) => {
     });
   }
 });
-
-// (route dupliquée supprimée)
 
 module.exports = router;
