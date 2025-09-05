@@ -181,7 +181,7 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
     
     const { data: event, error: eventError } = await supabase
       .from("event")
-      .select("id, title, slots")
+      .select("id, title, slots, allow_multiple_users")
       .eq("id", eventIdInt)
       .single();
       
@@ -199,13 +199,27 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
       });
     }
     
-    if (event.slots[slotIndexInt].user) {
+    const slot = event.slots[slotIndexInt];
+    const maxUsers = slot.maxUsers || 1;
+    const currentUsers = slot.currentUsers || 0;
+    
+    // Vérifier si le créneau est complet
+    if (currentUsers >= maxUsers) {
+      return res.status(409).json({
+        success: false,
+        message: "Slot is full",
+      });
+    }
+    
+    // Si allow_multiple_users est false, vérifier qu'aucun utilisateur n'est déjà inscrit
+    if (!event.allow_multiple_users && slot.user) {
       return res.status(409).json({
         success: false,
         message: "Slot already taken",
       });
     }
     
+    // Vérifier si l'étudiant est déjà inscrit à un créneau de cet événement
     const existingSlotIndex = event.slots.findIndex(slot => slot.user === id_student);
     if (existingSlotIndex >= 0) {
       return res.status(409).json({
@@ -217,7 +231,8 @@ router.post("/events/:eventId/slots/:slotIndex/register", async (req, res) => {
     const updatedSlots = [...event.slots];
     updatedSlots[slotIndexInt] = {
       ...updatedSlots[slotIndexInt],
-      user: id_student
+      user: id_student,
+      currentUsers: (updatedSlots[slotIndexInt].currentUsers || 0) + 1
     };
     
     const { data: updatedEvent, error: updateError } = await supabase
@@ -322,7 +337,7 @@ router.delete("/events/:eventId/slots/:slotIndex/unregister", async (req, res) =
     
     const { data: event, error: eventError } = await supabase
       .from("event")
-      .select("id, title, slots")
+      .select("id, title, slots, allow_multiple_users")
       .eq("id", eventIdInt)
       .single();
       
@@ -340,17 +355,33 @@ router.delete("/events/:eventId/slots/:slotIndex/unregister", async (req, res) =
       });
     }
     
-    if (event.slots[slotIndexInt].user !== id_student) {
+    const slot = event.slots[slotIndexInt];
+    
+    // Pour les créneaux avec un seul utilisateur, vérifier que c'est le bon utilisateur
+    if (!event.allow_multiple_users && slot.user !== id_student) {
       return res.status(403).json({
         success: false,
         message: "Student is not registered to this slot",
       });
     }
     
+    // Pour les créneaux avec plusieurs utilisateurs, vérifier que l'utilisateur est dans la liste
+    if (event.allow_multiple_users) {
+      // Dans ce cas, on utilise un système différent - on stocke les utilisateurs dans un array
+      // Pour l'instant, on garde la logique simple avec user
+      if (slot.user !== id_student) {
+        return res.status(403).json({
+          success: false,
+          message: "Student is not registered to this slot",
+        });
+      }
+    }
+    
     const updatedSlots = [...event.slots];
     updatedSlots[slotIndexInt] = {
       ...updatedSlots[slotIndexInt],
-      user: null
+      user: null,
+      currentUsers: Math.max((updatedSlots[slotIndexInt].currentUsers || 1) - 1, 0)
     };
     
     const { data: updatedEvent, error: updateError } = await supabase
