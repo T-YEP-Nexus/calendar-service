@@ -39,7 +39,7 @@ async function getValidEventId() {
   if (response.status === 200 && response.body.data.length > 0) {
     return response.body.data[0].id;
   }
-  
+
   // If no events exist, create one for testing
   const newEvent = {
     title: `Test Event for Student Tests ${Date.now()}`,
@@ -52,12 +52,12 @@ async function getValidEventId() {
     id_prom: "388bf596-6be5-4fee-b227-38bab0d5ed4a",
     target_promotions: null,
   };
-  
+
   const createResponse = await request(BASE_URL).post("/events").send(newEvent);
   if (createResponse.status === 201) {
     return createResponse.body.data.id;
   }
-  
+
   return null;
 }
 
@@ -82,18 +82,18 @@ describe("EventStudent CRUD Routes (Integration)", () => {
       validEventId = await getValidEventId();
       validStudentId = getValidStudentId();
       validEventStudentId = await getValidEventStudentId();
-      
+
       // Create a test event-student if none exists
       if (validEventId && validStudentId && !validEventStudentId) {
         const newStudentEvent = {
           id_student: validStudentId,
           id_event: validEventId,
         };
-        
+
         const response = await request(BASE_URL)
           .post("/event-students")
           .send(newStudentEvent);
-          
+
         if (response.status === 201) {
           testStudentEventId = response.body.data.id;
         }
@@ -118,7 +118,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL).get(
         `/event-students/${validEventStudentId}`
       );
@@ -141,7 +141,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL).get(
         `/event-students/student/${validStudentId}`
       );
@@ -170,16 +170,16 @@ describe("EventStudent CRUD Routes (Integration)", () => {
   });
 
   describe("POST /event-students - Create new student event", () => {
-         it("should create student event successfully", async () => {
-       if (!validEventId || !validStudentId) {
-         console.warn("No valid event or student ID found, skipping test");
-         return;
-       }
-       
-       const newStudentEvent = {
-         id_student: validStudentId,
-         id_event: validEventId,
-       };
+    it("should create student event successfully", async () => {
+      if (!validEventId || !validStudentId) {
+        console.warn("No valid event or student ID found, skipping test");
+        return;
+      }
+
+      const newStudentEvent = {
+        id_student: validStudentId,
+        id_event: validEventId,
+      };
 
       const response = await request(BASE_URL)
         .post("/event-students")
@@ -191,28 +191,26 @@ describe("EventStudent CRUD Routes (Integration)", () => {
       testStudentEventId = response.body.data.id;
     });
 
-         it("should return 409 for existing event student", async () => {
-       if (!validEventId || !validStudentId) {
-         console.warn("No valid event or student ID found, skipping test");
-         return;
-       }
-       
-       // Try to create the same event-student relationship again
-       const response = await request(BASE_URL)
-         .post("/event-students")
-         .send({
-           id_event: validEventId,
-           id_student: validStudentId,
-         });
-       expect(response.status).toBe(409);
-     });
+    it("should return 409 for existing event student", async () => {
+      if (!validEventId || !validStudentId) {
+        console.warn("No valid event or student ID found, skipping test");
+        return;
+      }
 
-         it("should return 400 for missing fields", async () => {
-       const response = await request(BASE_URL)
-         .post("/event-students")
-         .send({ id_event: validEventId || 1 });
-       expect(response.status).toBe(400);
-     });
+      // Try to create the same event-student relationship again
+      const response = await request(BASE_URL).post("/event-students").send({
+        id_event: validEventId,
+        id_student: validStudentId,
+      });
+      expect(response.status).toBe(409);
+    });
+
+    it("should return 400 for missing fields", async () => {
+      const response = await request(BASE_URL)
+        .post("/event-students")
+        .send({ id_event: validEventId || 1 });
+      expect(response.status).toBe(400);
+    });
 
     it("should return 400 for invalid student id format", async () => {
       const response = await request(BASE_URL)
@@ -229,7 +227,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL)
         .patch(`/event-students/${eventStudentId}`)
         .send({ id_event: validEventId || 1 });
@@ -244,7 +242,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL)
         .patch(`/event-students/${eventStudentId}`)
         .send({});
@@ -258,7 +256,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL)
         .patch(`/event-students/${eventStudentId}`)
         .send({ id_event: 100000000 });
@@ -272,7 +270,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL)
         .patch(`/event-students/${eventStudentId}`)
         .send({ id_student: "badidformat123" });
@@ -288,7 +286,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL).delete(
         `/event-students/${eventStudentId}`
       );
@@ -302,7 +300,7 @@ describe("EventStudent CRUD Routes (Integration)", () => {
         console.warn("No valid event-student ID found, skipping test");
         return;
       }
-      
+
       const response = await request(BASE_URL).delete(
         `/event-students/${eventStudentId}`
       );
